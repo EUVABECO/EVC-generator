@@ -45,8 +45,16 @@ def doReload():
     source.insert('1.0',json.dumps(default,ensure_ascii=False))
 
 def doShrink():
+    shrinked.delete('1.0',tkinter.END)
+    result.delete('1.0',tkinter.END)
+
     ejson = source.get('1.0',tkinter.END)
-    edata = json.loads(ejson)
+    try:
+        edata = json.loads(ejson)
+    except:
+        shrinked.insert('1.0',"Invalid JSON format")
+        return
+
     today= int(datetime.datetime.timestamp(datetime.datetime.now()))
     validity=int(datetime.datetime.timestamp(datetime.datetime.now() + datetime.timedelta(days=3650)))
     sdata = {
@@ -70,13 +78,19 @@ def doShrink():
         vdata = {"reg": vac["reg"],"rep": vac["rep"], "i": vac["i"] ,"a": age,"mp": int(vac["mp"][3:])}
         sdata['hcert']['v'].append(vdata)
 
-    shrinked.delete('1.0',tkinter.END)  
     shrinked.insert('1.0',json.dumps(sdata,ensure_ascii=False))
-    result.delete('1.0',tkinter.END)
 
 def doExpand():
+    source.delete('1.0',tkinter.END)
+    result.delete('1.0',tkinter.END)
+
     sjson=shrinked.get("1.0",tkinter.END)
-    sdata = json.loads(sjson)
+    try:
+        sdata = json.loads(sjson)
+    except:
+        source.insert('1.0',"Invalid JSON format")
+        return
+    
     edata = {
         "nam": {
             "fn": unidecode.unidecode(sdata["hcert"]["nam"]["fnt"]),
@@ -97,26 +111,38 @@ def doExpand():
         vdata = {"reg": vac["reg"],"rep": vac["rep"], "i": vac["i"], "dt": dt,"mp": code, "vn": label}
         edata["v"].append(vdata)
 
-    source.delete('1.0',tkinter.END)
     source.insert('1.0',json.dumps(edata,ensure_ascii=False))
 
 def doPack():  
+    result.delete('1.0',tkinter.END)
+
     sjson = shrinked.get('1.0',tkinter.END)
-    sdata = json.loads(sjson)
+    try:
+        sdata = json.loads(sjson)
+    except:
+        result.insert('1.0',"Invalid JSON format")
+        return
+
     cose = cwt.encode(sdata,priv_key)
     compressed = zlib.compress(cose)
     encoded = b45encode(compressed)
 
-    result.delete('1.0',tkinter.END)
     result.insert('1.0',encoded)
     shrinked.delete('1.0',tkinter.END)
 
 def doUnpack():
+    shrinked.delete('1.0',tkinter.END)
+    source.delete('1.0',tkinter.END)
+
     sresult=result.get('1.0',tkinter.END)
-    compressed = b45decode(sresult)
-    cose=zlib.decompress(compressed)
-    decoded=cwt.decode(cose,pub_key)
-    claims=Claims.new(decoded)
+    try:
+        compressed = b45decode(sresult)
+        cose=zlib.decompress(compressed)
+        decoded=cwt.decode(cose,pub_key)
+        claims=Claims.new(decoded)
+    except:
+        shrinked.insert("1.0","Invalid EVC format")
+        return
 
     sdata={
         'iss': claims.iss,
@@ -124,9 +150,8 @@ def doUnpack():
         'iat': claims.iat,
         'hcert': claims.hcert
         }
-    shrinked.delete('1.0',tkinter.END)
+
     shrinked.insert('1.0',json.dumps(sdata,ensure_ascii=False))
-    source.delete('1.0',tkinter.END)
 
 # Retrieve NUVA (fix path according to environment)
 print ("Loading NUVA, please wait ...")
@@ -139,6 +164,8 @@ window=tkinter.Tk()
 
 frame1 = tkinter.Frame()
 label1=tkinter.Label(frame1,text='  ORIGINAL  ')
+actClear = tkinter.Button(frame1,text='Clear', command = doClear)
+actReload = tkinter.Button(frame1,text='Reload', command = doReload)
 source=tkinter.Text(width=100,height=10)
 frame2 = tkinter.Frame()
 actShrink=tkinter.Button(frame2,text='Shrink V',command=doShrink)
@@ -152,6 +179,8 @@ label3=tkinter.Label(frame3, text='  RESULT  ')
 result=tkinter.Text(width=100,height=10)
 
 frame1.pack()
+actClear.pack(side="left")
+actReload.pack(side="right")
 label1.pack()
 source.pack()
 frame2.pack()
