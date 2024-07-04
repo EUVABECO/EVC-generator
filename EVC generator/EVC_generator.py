@@ -6,29 +6,66 @@ from rdflib import *
 from base45 import b45decode,b45encode
 from cwt import Claims,COSEKey
 
-default={
-        'nam': {
-            'fn': 'KAAG', 'gn': 'Francois',
-            'fnt': 'KAAG', 'gnt': 'François'
-            },
-        'dob': '1963-07-19',
-    "v": [{
-            "reg": "FRA", "rep":3,"i": 3141,
-            "dt": "1964-02-11", 
-            "mp": "VAC0138","vn": "Diphtheria-Tetanus-Pertussis-Polio vaccine, unspecified"
-        }, {
-            "reg": "FRA", "rep": 3,"i": 5926,
-            "dt": "1965-04-05",
-            "mp": "VAC0138","vn": "Diphtheria-Tetanus-Pertussis-Polio vaccine, unspecified"
-        }, {
-            "reg": "FRA","rep": 3,"i": 535,
-            "dt": "1971-06-14",
-            "mp": "VAC0134","vn": "BCG vaccine, unspecified"
-        }, {
-            "reg": "FRA","rep": 3,"i": 8979,
-            "dt": "1972-10-12",
-            "mp": "VAC0063","vn": "TETRACOQ"
-        } ]}
+default = {
+    "resourceType": "Bundle",
+    "type": "collection",
+    "entry": [{
+			"fullUrl": "http://EVC/Patient/this",
+            "resource": {
+				"text": {"status": "generated", "div":"<div xmlns='http://www.w3.org/1999/xhtml'>Patient John DOË</div>"},
+				"id":"this",
+                "resourceType": "Patient",
+                "name": [{
+                        "family": "DOË",
+                        "given": ["John"]
+                    } ],               
+                "birthDate": "2017-07-19"
+            }
+        },        
+       {
+		   "fullUrl": "http://EVC/Immunization/1",
+            "resource": {
+				"text": {"status":"generated","div":"<div xmlns='http://www.w3.org/1999/xhtml'>REPEVAX administered on 2021-05-05</div>"},
+				"id":"1",
+                "resourceType": "Immunization",
+                "identifier": [{
+                        "system": "http://EVC/MasterRecord",
+                        "value": "FRA/36/2021-05-05/1245"
+                    } ],
+                "status": "completed",
+                "vaccineCode": {
+                    "coding": [{
+                            "system": "urn:oid:1.3.6.1.4.1.48601.1.1.1",
+                            "code": "VAC0029",
+                            "display": "REPEVAX"
+                        }] },
+                "patient": {"reference": "Patient/this"},
+                "occurrenceDateTime": "2021-05-05"				
+            }
+        }, 
+       {
+			"fullUrl": "http://EVC/Immunization/2",
+            "resource": {
+				"text": {"status":"generated","div":"<div  xmlns='http://www.w3.org/1999/xhtml'>TETRACOQ administered on 2022-03-03</div>"},
+				"id":"2",
+                "resourceType": "Immunization",
+                "identifier": [{
+                        "system": "http://EVC/MasterRecord",
+                        "value": "FRA/36/2022-03-03/127"
+                    }],
+                "status": "completed",
+                "vaccineCode": {
+                    "coding": [{
+                            "system": "urn:oid:1.3.6.1.4.1.48601.1.1.1",
+                            "code": "VAC0063",
+                            "display": "TETRACOQ"
+                        } ] },
+                "patient": {"reference": "Patient/this" },
+                "occurrenceDateTime": "2022-03-03"				
+            }
+        }
+    ]
+}
 
 # Données de signature
 priv_pem="-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIMsO/7yefxo+gG7Gnpz4UG4t3Fn7l/+tqJmM1dL/Xqtv\n-----END PRIVATE KEY-----"
@@ -42,7 +79,7 @@ def doClear():
 
 def doReload():
     source.delete('1.0',tkinter.END)
-    source.insert('1.0',json.dumps(default,ensure_ascii=False))
+    source.insert('1.0',json.dumps(default,ensure_ascii=False,indent=2))
 
 def doShrink():
     shrinked.delete('1.0',tkinter.END)
@@ -57,6 +94,31 @@ def doShrink():
 
     today= int(datetime.datetime.timestamp(datetime.datetime.now()))
     validity=int(datetime.datetime.timestamp(datetime.datetime.now() + datetime.timedelta(days=3650)))
+
+#    First retrieve patient information
+
+    for entry in edata['entry']:
+        resource = entry['resource']
+        if resource ['resourceType'] == "Patient":
+            fnt = resource['name'][0]['family']
+            gnt = resource['name'][0]['given'][0]
+            dobstr=resource['birthDate']
+            dob = datetime.datetime.strptime(dobstr,"%Y-%m-%d")
+            break
+    v = []
+
+    for entry in edata['entry']:
+        resource = entry['resource']
+        if resource['resourceType'] == "Immunization":
+            age = (datetime.datetime.strptime(resource['occurrenceDateTime'],"%Y-%m-%d") - dob).days
+            master=resource['identifier'][0]['value'].split('/')
+            vdata = {'reg':master[0],
+                     'rep':int(master[1]),
+                     'i':int(master[3]),
+                     'a':age,
+                     'mp':int(resource['vaccineCode']['coding'][0]['code'][3:])}
+            v.append(vdata)
+
     sdata = {
         "iss":"SYA",
         "exp": validity,
@@ -64,20 +126,12 @@ def doShrink():
         "hcert":{
                 "ver":"1.0.0",
                 "nam":{
-                    "fnt": edata['nam']['fnt'],
-                    "gnt": edata['nam']['gnt']
+                    "fnt": fnt,
+                    "gnt": gnt
                     },
-                "dob":edata['dob'],
-                "v":[]}
+                "dob":dobstr,
+                "v":v}
         }
-  
-    dob = datetime.datetime.strptime(edata['dob'],"%Y-%m-%d")
-    
-    for vac in edata['v']:
-        age = (datetime.datetime.strptime(vac["dt"],"%Y-%m-%d") - dob).days
-        vdata = {"reg": vac["reg"],"rep": vac["rep"], "i": vac["i"] ,"a": age,"mp": int(vac["mp"][3:])}
-        sdata['hcert']['v'].append(vdata)
-
     shrinked.insert('1.0',json.dumps(sdata,ensure_ascii=False))
 
 def doExpand():
@@ -90,28 +144,64 @@ def doExpand():
     except:
         source.insert('1.0',"Invalid JSON format")
         return
-    
-    edata = {
-        "nam": {
-            "fn": unidecode.unidecode(sdata["hcert"]["nam"]["fnt"]),
-            "gn": unidecode.unidecode(sdata["hcert"]["nam"]["gnt"]),
-            "fnt": sdata["hcert"]["nam"]["fnt"],
-            "gnt": sdata["hcert"]["nam"]["gnt"]
-            },
-        "dob": sdata["hcert"]["dob"],
-        "v": []}
 
-    dob = datetime.datetime.strptime(edata['dob'],"%Y-%m-%d")
+    edata = {
+    "resourceType": "Bundle",
+    "type": "collection",
+    "entry": [{
+			"fullUrl": "http://EVC/Patient/this",
+            "resource": {
+				"text": {"status": "generated", 
+                         "div":"<div xmlns='http://www.w3.org/1999/xhtml'>Patient "+sdata['hcert']['nam']['gnt']+ " "+sdata['hcert']['nam']['fnt']+"</div>"},
+				"id":"this",
+                "resourceType": "Patient",
+                "name": [{
+                        "family": sdata['hcert']['nam']['fnt'],
+                        "given": [sdata['hcert']['nam']['gnt']]
+                    } ],               
+                "birthDate": sdata['hcert']['dob']
+            }
+        }
+    ]
+}
+       
+    dob = datetime.datetime.strptime(sdata['hcert']['dob'],"%Y-%m-%d")
+    index =0
 
     for vac in sdata["hcert"]["v"]:
         dt = (dob+datetime.timedelta(vac["a"])).strftime("%Y-%m-%d")
         code = "VAC"+str(vac["mp"]).zfill(4)
         concept = URIRef("http://ivci.org/NUVA#"+code)
         label = g.value(concept,RDFS.label)
-        vdata = {"reg": vac["reg"],"rep": vac["rep"], "i": vac["i"], "dt": dt,"mp": code, "vn": label}
-        edata["v"].append(vdata)
+        if not label: label="Unknown"
+        index += 1
 
-    source.insert('1.0',json.dumps(edata,ensure_ascii=False))
+        vdata = {
+			"fullUrl": "http://EVC/Immunization/"+str(index),
+            "resource": {
+				"text": {"status":"generated",
+                         "div":"<div  xmlns='http://www.w3.org/1999/xhtml'>"+label+" administered on "+dt+"</div>"},
+				"id":str(index),
+                "resourceType": "Immunization",
+                "identifier": [{
+                        "system": "http://EVC/MasterRecord",
+                        "value": vac['reg']+"/"+str(vac['rep'])+"/"+dt+"/"+str(vac['i'])
+                    }],
+                "status": "completed",
+                "vaccineCode": {
+                    "coding": [{
+                            "system": "urn:oid:1.3.6.1.4.1.48601.1.1.1",
+                            "code": code,
+                            "display": label
+                        } ] },
+                "patient": {"reference": "Patient/this" },
+                "occurrenceDateTime": dt		
+            }
+        }
+
+        edata['entry'].append(vdata)
+
+    source.insert('1.0',json.dumps(edata,ensure_ascii=False,indent=2))
 
 def doPack():  
     result.delete('1.0',tkinter.END)
@@ -163,7 +253,7 @@ g.parse(str(Path.home())+"/Documents/NUVA/nuva_core.ttl")
 window=tkinter.Tk()
 
 frame1 = tkinter.Frame()
-label1=tkinter.Label(frame1,text='  ORIGINAL  ')
+label1=tkinter.Label(frame1,text='  FHIR  ')
 actClear = tkinter.Button(frame1,text='Clear', command = doClear)
 actReload = tkinter.Button(frame1,text='Reload', command = doReload)
 source=tkinter.Text(width=100,height=10)
