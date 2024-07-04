@@ -246,7 +246,7 @@ def doUnpack():
 # Retrieve NUVA (fix path according to environment)
 print ("Loading NUVA, please wait ...")
 g = Graph()
-g.parse(str(Path.home())+"/Documents/NUVA/nuva_core.ttl")
+g.parse("nuva_core.ttl")
 
 #Build window and fields
 
