@@ -92,11 +92,7 @@ def doShrink():
         shrinked.insert('1.0',"Invalid JSON format")
         return
 
-    today= int(datetime.datetime.timestamp(datetime.datetime.now()))
-    validity=int(datetime.datetime.timestamp(datetime.datetime.now() + datetime.timedelta(days=3650)))
-
 #    First retrieve patient information
-
     for entry in edata['entry']:
         resource = entry['resource']
         if resource ['resourceType'] == "Patient":
@@ -105,33 +101,20 @@ def doShrink():
             dobstr=resource['birthDate']
             dob = datetime.datetime.strptime(dobstr,"%Y-%m-%d")
             break
+# Then vaccines
     v = []
-
     for entry in edata['entry']:
         resource = entry['resource']
         if resource['resourceType'] == "Immunization":
             age = (datetime.datetime.strptime(resource['occurrenceDateTime'],"%Y-%m-%d") - dob).days
             master=resource['identifier'][0]['value'].split('/')
-            vdata = {'reg':master[0],
-                     'rep':int(master[1]),
-                     'i':int(master[3]),
+            vdata = {'reg':master[0],'rep':int(master[1]),'i':int(master[3]),
                      'a':age,
                      'mp':int(resource['vaccineCode']['coding'][0]['code'][3:])}
             v.append(vdata)
 
-    sdata = {
-        "iss":"SYA",
-        "exp": validity,
-        "iat":today,
-        "hcert":{
-                "ver":"1.0.0",
-                "nam":{
-                    "fnt": fnt,
-                    "gnt": gnt
-                    },
-                "dob":dobstr,
-                "v":v}
-        }
+    sdata = {"ver":"1.0.0","nam":{"fnt": fnt,"gnt": gnt},"dob":dobstr,"v":v
+             }       
     shrinked.insert('1.0',json.dumps(sdata,ensure_ascii=False))
 
 def doExpand():
@@ -149,26 +132,27 @@ def doExpand():
     "resourceType": "Bundle",
     "type": "collection",
     "entry": [{
-			"fullUrl": "http://EVC/Patient/this",
-            "resource": {
-				"text": {"status": "generated", 
-                         "div":"<div xmlns='http://www.w3.org/1999/xhtml'>Patient "+sdata['hcert']['nam']['gnt']+ " "+sdata['hcert']['nam']['fnt']+"</div>"},
-				"id":"this",
-                "resourceType": "Patient",
-                "name": [{
-                        "family": sdata['hcert']['nam']['fnt'],
-                        "given": [sdata['hcert']['nam']['gnt']]
-                    } ],               
-                "birthDate": sdata['hcert']['dob']
+		"fullUrl": "http://EVC/Patient/this",
+        "resource": {
+			"text": {"status": "generated", 
+                        "div":"<div xmlns='http://www.w3.org/1999/xhtml'>Patient "
+                        +sdata['nam']['gnt']+ " "+sdata['nam']['fnt']+"</div>"},
+			"id":"this",
+            "resourceType": "Patient",
+            "name": [{
+                    "family": sdata['nam']['fnt'],
+                    "given": [sdata['nam']['gnt']]
+                } ],               
+            "birthDate": sdata['dob']
             }
         }
     ]
 }
        
-    dob = datetime.datetime.strptime(sdata['hcert']['dob'],"%Y-%m-%d")
+    dob = datetime.datetime.strptime(sdata['dob'],"%Y-%m-%d")
     index =0
 
-    for vac in sdata["hcert"]["v"]:
+    for vac in sdata ["v"]:
         dt = (dob+datetime.timedelta(vac["a"])).strftime("%Y-%m-%d")
         code = "VAC"+str(vac["mp"]).zfill(4)
         concept = URIRef("http://ivci.org/NUVA#"+code)
@@ -212,8 +196,13 @@ def doPack():
     except:
         result.insert('1.0',"Invalid JSON format")
         return
+    
+    today= int(datetime.datetime.timestamp(datetime.datetime.now()))
+    validity=int(datetime.datetime.timestamp(datetime.datetime.now() + datetime.timedelta(days=3650)))
 
-    cose = cwt.encode(sdata,priv_key)
+    topack = {"iss":"SYA","exp": validity,"iat":today,"hcert": sdata}
+
+    cose = cwt.encode(topack,priv_key)
     compressed = zlib.compress(cose)
     encoded = b45encode(compressed)
 
@@ -234,16 +223,9 @@ def doUnpack():
         shrinked.insert("1.0","Invalid EVC format")
         return
 
-    sdata={
-        'iss': claims.iss,
-        'exp': claims.exp,
-        'iat': claims.iat,
-        'hcert': claims.hcert
-        }
+    shrinked.insert('1.0',json.dumps(claims.hcert,ensure_ascii=False))
 
-    shrinked.insert('1.0',json.dumps(sdata,ensure_ascii=False))
-
-# Retrieve NUVA (fix path according to environment)
+# Retrieve NUVA
 print ("Loading NUVA, please wait ...")
 g = Graph()
 g.parse("nuva_core.ttl")
