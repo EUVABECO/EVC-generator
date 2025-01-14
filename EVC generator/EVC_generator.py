@@ -234,7 +234,7 @@ def doUnpack():
 # Retrieve NUVA
 print ("Loading NUVA, please wait ...")
 g = Graph()
-g.parse("nuva_core.ttl")
+g.parse("https://ivci.org/nuva/nuva_core.ttl",format="turtle")
 
 #Build window and fields
 
