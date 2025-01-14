@@ -68,11 +68,17 @@ default = {
 }
 
 # Données de signature
-priv_pem="-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIMsO/7yefxo+gG7Gnpz4UG4t3Fn7l/+tqJmM1dL/Xqtv\n-----END PRIVATE KEY-----"
-pub_pem="-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA4slb4ugEYVeVYaGZ8OXAz8uXZiNd5yno0h3JZBhCLlM=\n-----END PUBLIC KEY-----"
-vkid='33'
-priv_key=COSEKey.from_pem(priv_pem,kid=vkid)
-pub_key=COSEKey.from_pem(pub_pem,kid=vkid)
+jwk = {
+            "kty": "EC",
+            "crv": "P-256",
+            "alg": "ES256",
+            "x": "FDMpzOeGjkFpJ1mc9lo0884v/aVafspp7YkZo5TULw8",
+            "y": "YPfxp4DYp4O/t6LdayeW6BKNu87509Fo25Uplxo257k",
+            "d": "bBOCdlrsU1jxF3M9KBwce9w5iE0EpFoebGfIWLwgbBk",
+            "kid": "AsymmetricECDSA256"
+          }		
+
+key =COSEKey.from_jwk(jwk)
 
 def doClear():
     source.delete('1.0',tkinter.END)
@@ -202,7 +208,7 @@ def doPack():
 
     topack = {"iss":"SYA","exp": validity,"iat":today,"hcert": sdata}
 
-    cose = cwt.encode(topack,priv_key)
+    cose = cwt.encode(topack,key)
     compressed = zlib.compress(cose)
     encoded = b45encode(compressed)
 
@@ -217,7 +223,7 @@ def doUnpack():
     try:
         compressed = b45decode(sresult)
         cose=zlib.decompress(compressed)
-        decoded=cwt.decode(cose,pub_key)
+        decoded=cwt.decode(cose,key)
         claims=Claims.new(decoded)
     except:
         shrinked.insert("1.0","Invalid EVC format")
