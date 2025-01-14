@@ -161,7 +161,7 @@ def doExpand():
     for vac in sdata ["v"]:
         dt = (dob+datetime.timedelta(vac["a"])).strftime("%Y-%m-%d")
         code = "VAC"+str(vac["mp"]).zfill(4)
-        concept = URIRef("http://ivci.org/NUVA#"+code)
+        concept = URIRef("http://ivci.org/NUVA/"+code)
         label = g.value(concept,RDFS.label)
         if not label: label="Unknown"
         index += 1
@@ -204,9 +204,8 @@ def doPack():
         return
     
     today= int(datetime.datetime.timestamp(datetime.datetime.now()))
-    validity=int(datetime.datetime.timestamp(datetime.datetime.now() + datetime.timedelta(days=3650)))
 
-    topack = {"iss":"SYA","exp": validity,"iat":today,"hcert": sdata}
+    topack = {"iss":"SYA","iat":today,"hcert": sdata}
 
     cose = cwt.encode(topack,key)
     compressed = zlib.compress(cose)
