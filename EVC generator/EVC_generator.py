@@ -1,11 +1,14 @@
 import cwt,base45,zlib,json
+import jwcrypto
 import time,datetime, unidecode,os
 import tkinter
+import requests
 from pathlib import Path
 from rdflib import *
 from base45 import b45decode,b45encode
 from base64 import b64encode
 from cwt import Claims,COSEKey,CWT,load_pem_hcert_dsc
+from jwcrypto import jwk
 from typing import Any,Union,Dict
 
 class MyCWT(CWT):
@@ -51,45 +54,33 @@ default = {
             }}]}
 
 # Données de signature SYA
-jwk = {
+jwk_sya = {
             "kty": "EC",
             "crv": "P-256",
             "alg": "ES256",
             "x": "FDMpzOeGjkFpJ1mc9lo0884v/aVafspp7YkZo5TULw8",
             "y": "YPfxp4DYp4O/t6LdayeW6BKNu87509Fo25Uplxo257k",
             "d": "bBOCdlrsU1jxF3M9KBwce9w5iE0EpFoebGfIWLwgbBk",
-            "kid": "AsymmetricECDSA256"
+            "kid": "SYA25A"
           }
-# Clé publique LUX (2024)
-pemlux = "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAES7+ibOk3VEzhFhAH55tNgRDlNQBD\nB3pr97KtSis5dDIojsuHCgp8trQSHAqDs2LlGUvPQGKedNzmbirxCPS4jA==\n-----END PUBLIC KEY-----"
-# Ancienne clé LUX (2021)
-certlux="""-----BEGIN CERTIFICATE-----
-MIIE7jCCAqKgAwIBAgIIFqh8swSpPNEwQQYJKoZIhvcNAQEKMDSgDzANBglghkgBZQMEAgEFAKEcMBoGCSqGSIb3DQEBCDANBglghkgBZQMEAgEFAKIDAgEgMFoxCzAJ
-BgNVBAYTAkxVMR0wGwYDVQQKDBRJTkNFUlQgcHVibGljIGFnZW5jeTEsMCoGA1UEAwwjR3JhbmQgRHVjaHkgb2YgTHV4ZW1ib3VyZyBDU0NBIFRFU1QwHhcNMjExMTEw
-MTY0MzA3WhcNMzIwMTA3MTY0MzA2WjBcMQswCQYDVQQGEwJMVTEbMBkGA1UECgwSTWluaXN0cnkgb2YgSGVhbHRoMTAwLgYDVQQDDCdHcmFuZCBEdWNoeSBvZiBMdXhl
-bWJvdXJnIERTIENWRSBURVNUIDEwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQkNgSXxqTzujne5q8JdBc7Q0fK6HNH1aU1Ap+GRCfK/FvjLIWjcwwIqy4Bb9FuZv/9
-sID9Jvgj8dl4NR83cr7No4IBFzCCARMwHwYDVR0jBBgwFoAUm6ZBIYGn0NWe0pxQwMYre7jzGJowKwYDVR0SBCQwIoEOY3NjYUBpbmNlcnQubHWkEDAOMQwwCgYDVQQH
-DANMVVgwKwYDVR0RBCQwIoEOY3NjYUBpbmNlcnQubHWkEDAOMQwwCgYDVQQHDANMVVgwOgYDVR0fBDMwMTAvoC2gK4YpaHR0cDovL3JlcG9zaXRvcnkuaW5jZXJ0Lmx1
-L2NzY2EtdGVzdC5jcmwwHQYDVR0OBBYEFCPRmJzoLvJimSuXf7jhxDziEKvJMCsGA1UdEAQkMCKADzIwMjExMTEwMTY0MzA3WoEPMjAyMjA1MDkxNjQzMDdaMA4GA1Ud
-DwEB/wQEAwIHgDBBBgkqhkiG9w0BAQowNKAPMA0GCWCGSAFlAwQCAQUAoRwwGgYJKoZIhvcNAQEIMA0GCWCGSAFlAwQCAQUAogMCASADggIBAEmhyrdp5/qHq1cjTkgi
-agJPeirJOEqzZ7hv/FXMqrWyuzUl2Nzobim55t4qeThXdu0Ou94g2X0RKBVkIPOo9fEcroUp/bRmKydreAXMZxDzbLKJ/rdDiV8dNv3stB0jUOChZOO2nBWoHwrPh4t3
-XYYcEnSin3/y+6e1oDdgJV8qFu5o7hBwD6zCiIMKo5dm5toGSjD8U4D5vQy0UPlIK1SnKFcFZNhZbSqacTzqPOwEiAhaXie/WcskUY1kc31nGdgUKZ6eFZaXArfDxgP9
-dzfAxf8qdAEt5Dax2E6t+n6k2gPEqFV5WS7xrMDGvLt1uqgQ3X0bfR3OI6ghgVp0FBcZ/eZMXFlmaiPqkSmlqf+ffspjsxrXTmzEOP4V671MkOFojHEUxJy/kg6g7SKx
-AyUd7MaV2N37uqDHYQHzR8KQCJ9pcRTKOrON8VfSRQSKb1DoKghi4OuwLU8v0L1Q+9tPLOOX9L/7j+yRzNvJGOn+BqlDGKXrYXbN2iFA0zHw60WP1gkbWIqJrg+hYuBo
-lfy6cpukbJR+QtS/3jK4UxuSZBVjuy4+vudbCHzh/wAUdjjCEUklkc3TGEZWNebTWBVpFlo37XgETG8fapqbwkUnvrno6Sd38sDLfyuPogkV385qVvALfEkd0UmBfYF2
-a+kgba0kkt+zMD/4Ja+BF2q4
------END CERTIFICATE-----"""
+myKey =COSEKey.from_jwk(jwk_sya)
+keyexp = int(datetime.datetime.strptime("2050-12-31","%Y-%m-%d").timestamp())
 
-key =COSEKey.from_jwk(jwk)
+# Load public keys
+keys = requests.get("https://keys.euvabeco.eu/.well-known/jwks.json")
+jwks = json.loads(keys.content)
 
 pubkeys=[]
-pubkeys.append(key)
-pubkey = load_pem_hcert_dsc(certlux)
-pubkeys.append(pubkey)
-pubkey = COSEKey.from_pem(pemlux,kid=b'\xc9\xd86y3\xb4\xecL')
-pubkeys.append(pubkey)
 
-keyexp = int(datetime.datetime.strptime("2050-12-31","%Y-%m-%d").timestamp())
+for key in jwks['keys']:
+    kid = key['kid']
+    if kid.startswith("0x"):      
+        pem= jwk.JWK(kty = key['kty'],crv = key['crv'], x = key['x'],y = key['y']).export_to_pem()
+        pubkey=COSEKey.from_pem(pem,kid=bytes.fromhex(kid[2:]))
+    else:
+        pubkey=COSEKey.from_jwk(key)
+    pubkeys.append(pubkey)
+        
 
 def doClear():
     source.delete('1.0',tkinter.END)
@@ -214,10 +205,10 @@ def doPack():
         result.insert('1.0',"Invalid JSON format")
         return
     
-    today= int(datetime.datetime.timestamp(datetime.datetime.now()))    
+    today= int(datetime.datetime.timestamp(datetime.datetime.now()))
     topack = {"iss":"SYA","exp":keyexp, "iat":today, "hcert": sdata}
 
-    cose = mycwt.encode(topack,key)
+    cose = mycwt.encode(topack,myKey)
     compressed = zlib.compress(cose)
     encoded = b45encode(compressed)
 
