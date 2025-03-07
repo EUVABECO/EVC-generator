@@ -1,5 +1,6 @@
 import cwt,base45,zlib,json
 import jwcrypto
+import qrcode
 import time,datetime, unidecode,os
 import tkinter
 import requests
@@ -42,12 +43,12 @@ default = {
             }}, 
        {    "fullUrl": "http://EVC/Immunization/2",
             "resource": {
-				"text": {"status":"generated","div":"<div  xmlns='http://www.w3.org/1999/xhtml'>TETRACOQ administered on 2022-03-03</div>"},
+				"text": {"status":"generated","div":"<div  xmlns='http://www.w3.org/1999/xhtml'>QDENGA administered on 2022-03-03</div>"},
 				"id":"2","resourceType": "Immunization",
                 "identifier": [{"system": "http://EVC/MasterRecord","value": "FRA/36/2022-03-03/127"}],
                 "status": "completed",
                 "vaccineCode": {
-                    "coding": [{"system": "urn:oid:1.3.6.1.4.1.48601.1.1.1","code": "VAC0063","display": "TETRACOQ"
+                    "coding": [{"system": "urn:oid:1.3.6.1.4.1.48601.1.1.1","code": "VAC0644","display": "QDENGA"
                         } ] },
                 "patient": {"reference": "Patient/this" },
                 "occurrenceDateTime": "2022-03-03"				
@@ -196,7 +197,9 @@ def doExpand():
     source.insert('1.0',json.dumps(edata,ensure_ascii=False,indent=2))
 
 def doPack():  
+    global img
     result.delete('1.0',tkinter.END)
+    image.delete('1.0',tkinter.END)
 
     sjson = shrinked.get('1.0',tkinter.END)
     try:
@@ -212,7 +215,14 @@ def doPack():
     compressed = zlib.compress(cose)
     encoded = b45encode(compressed)
 
+    qr=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data('VC1:'+encoded.decode())
+    qrimage = qr.make_image()
+    qrimage.save("QRCODE.png")
+    img=tkinter.PhotoImage(file='QRCODE.png')
     result.insert('1.0',encoded)
+    image.image_create(tkinter.END, image = img)
+
     shrinked.delete('1.0',tkinter.END)
 
 def doUnpack():
@@ -254,6 +264,7 @@ actPack=tkinter.Button(frame3,text='Pack V',command=doPack)
 actUnpack=tkinter.Button(frame3,text='Unpack ^',command=doUnpack)
 label3=tkinter.Label(frame3, text='  RESULT  ')
 result=tkinter.Text(width=100,height=10)
+image=tkinter.Text(width=100,height=50)
 
 frame1.pack()
 actClear.pack(side="left")
@@ -270,6 +281,7 @@ actPack.pack(side="left")
 actUnpack.pack(side="right")
 label3.pack()
 result.pack()
+image.pack()
 
 # Initialize and run
 
