@@ -129,6 +129,7 @@ def doShrink():
 def doExpand():
     source.delete('1.0',tkinter.END)
     result.delete('1.0',tkinter.END)
+    image.delete('1.0',tkinter.END)
 
     sjson=shrinked.get("1.0",tkinter.END)
     try:
