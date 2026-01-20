@@ -11,6 +11,8 @@ from base64 import b64encode
 from cwt import Claims,COSEKey,CWT,load_pem_hcert_dsc
 from jwcrypto import jwk
 from typing import Any,Union,Dict
+from tkinter import filedialog
+from pypdf import PdfReader
 
 class MyCWT(CWT):
     # This is to avoid the optional claims forced by PyCwt: iat,nbf et exp
@@ -82,6 +84,19 @@ for key in jwks['keys']:
         pubkey=COSEKey.from_jwk(key)
     pubkeys.append(pubkey)
         
+
+def setResult(data):
+    global img
+    shrinked.delete('1.0',tkinter.END)
+    result.delete('1.0',tkinter.END)
+    image.delete('1.0',tkinter.END)
+    qr=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(data)
+    qrimage = qr.make_image()
+    qrimage.save("QRCODE.png")
+    img=tkinter.PhotoImage(file='QRCODE.png')
+    result.insert('1.0',data)
+    image.image_create(tkinter.END, image = img)
 
 def doClear():
     source.delete('1.0',tkinter.END)
@@ -197,11 +212,7 @@ def doExpand():
 
     source.insert('1.0',json.dumps(edata,ensure_ascii=False,indent=2))
 
-def doPack():  
-    global img
-    result.delete('1.0',tkinter.END)
-    image.delete('1.0',tkinter.END)
-
+def doPack():
     sjson = shrinked.get('1.0',tkinter.END)
     try:
         sdata = json.loads(sjson)
@@ -214,17 +225,8 @@ def doPack():
 
     cose = mycwt.encode(topack,myKey)
     compressed = zlib.compress(cose)
-    encoded = b45encode(compressed)
-
-    qr=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M)
-    qr.add_data('VC1:'+encoded.decode())
-    qrimage = qr.make_image()
-    qrimage.save("QRCODE.png")
-    img=tkinter.PhotoImage(file='QRCODE.png')
-    result.insert('1.0',encoded)
-    image.image_create(tkinter.END, image = img)
-
-    shrinked.delete('1.0',tkinter.END)
+    encoded = 'VC1:'+b45encode(compressed).decode()
+    setResult(encoded)
 
 def doUnpack():
     shrinked.delete('1.0',tkinter.END)
@@ -232,7 +234,7 @@ def doUnpack():
 
     sresult=result.get('1.0',tkinter.END)
     try:
-        compressed = b45decode(sresult)
+        compressed = b45decode(sresult[4:])
         cose=zlib.decompress(compressed)
         decoded=cwt.decode(cose,pubkeys)
         claims=Claims.new(decoded)
@@ -241,6 +243,15 @@ def doUnpack():
         return
 
     shrinked.insert('1.0',json.dumps(claims.hcert,ensure_ascii=False))
+
+def doLoadpdf():
+    filePath = tkinter.filedialog.askopenfilename(filetypes=[("PDF Files",".pdf")])
+    reader = PdfReader(filePath)
+    try:
+        data = reader.metadata['/EVC']
+        setResult(data)
+    except:
+        result.insert("1.0","EVC metadata not found")
 
 # Retrieve NUVA
 print ("Loading NUVA, please wait ...")
@@ -263,6 +274,7 @@ shrinked=tkinter.Text(width=100,height=10)
 frame3 = tkinter.Frame()
 actPack=tkinter.Button(frame3,text='Pack V',command=doPack)
 actUnpack=tkinter.Button(frame3,text='Unpack ^',command=doUnpack)
+actLoad = tkinter.Button(frame3,text="Load PDF", command=doLoadpdf)
 label3=tkinter.Label(frame3, text='  RESULT  ')
 result=tkinter.Text(width=100,height=10)
 image=tkinter.Text(width=100,height=50)
@@ -280,6 +292,7 @@ shrinked.pack()
 frame3.pack()
 actPack.pack(side="left")
 actUnpack.pack(side="right")
+actLoad.pack(side="left")
 label3.pack()
 result.pack()
 image.pack()
