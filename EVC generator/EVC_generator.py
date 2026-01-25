@@ -251,6 +251,7 @@ def doLoadpdf():
         data = reader.metadata['/EVC']
         setResult(data)
     except:
+        result.delete('1.0', tkinter.END)
         result.insert("1.0","EVC metadata not found")
 
 # Retrieve NUVA
