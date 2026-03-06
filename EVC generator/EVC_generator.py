@@ -7,12 +7,12 @@ import requests
 from pathlib import Path
 from rdflib import *
 from base45 import b45decode,b45encode
-from base64 import b64encode
 from cwt import Claims,COSEKey,CWT,load_pem_hcert_dsc
 from jwcrypto import jwk
 from typing import Any,Union,Dict
 from tkinter import filedialog
 from pypdf import PdfReader
+from pyzbar import pyzbar
 
 class MyCWT(CWT):
     # This is to avoid the optional claims forced by PyCwt: iat,nbf et exp
@@ -233,6 +233,9 @@ def doUnpack():
     source.delete('1.0',tkinter.END)
 
     sresult=result.get('1.0',tkinter.END)
+    if sresult[0:3] != "VC1:":
+        print("Missing version prefix")
+        sresult = 'VC1:'+sresult
     try:
         compressed = b45decode(sresult[4:])
         cose=zlib.decompress(compressed)
@@ -251,8 +254,17 @@ def doLoadpdf():
         data = reader.metadata['/EVC']
         setResult(data)
     except:
-        result.delete('1.0', tkinter.END)
-        result.insert("1.0","EVC metadata not found")
+        print ("Missing EVC metadata, trying to extract QRCode")
+        found = False
+        for page in reader.pages:
+            for i,image_object in enumerate(page.images):
+                data = pyzbar.decode(image_object.image)
+                if data:
+                    setResult(data[0].data.decode("utf-8"))
+                    found = True
+        if not found:
+            result.delete('1.0', tkinter.END)
+            result.insert("1.0","EVC metadata not found")
 
 # Retrieve NUVA
 print ("Loading NUVA, please wait ...")
@@ -278,7 +290,7 @@ actUnpack=tkinter.Button(frame3,text='Unpack ^',command=doUnpack)
 actLoad = tkinter.Button(frame3,text="Load PDF", command=doLoadpdf)
 label3=tkinter.Label(frame3, text='  RESULT  ')
 result=tkinter.Text(width=100,height=10)
-image=tkinter.Text(width=100,height=50)
+image=tkinter.Text(width=100,height=50,padx=1,pady=1)
 
 frame1.pack()
 actClear.pack(side="left")
