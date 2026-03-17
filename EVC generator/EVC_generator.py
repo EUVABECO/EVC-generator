@@ -234,7 +234,7 @@ def doUnpack():
     source.delete('1.0',tkinter.END)
 
     sresult=result.get('1.0',tkinter.END)
-    if sresult[0:3] != "VC1:":
+    if sresult[0:4] != "VC1:":
         print("Missing version prefix")
         sresult = 'VC1:'+sresult
     try:
